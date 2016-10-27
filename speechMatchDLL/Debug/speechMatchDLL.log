@@ -1,0 +1,53 @@
+﻿生成启动时间为 2016/8/25 14:15:40。
+     1>项目“D:\speech_match\speechmatch-最终备份-20160517\speechMatchDLL\speechMatchDLL\speechMatchDLL\speechMatchDLL.vcxproj”在节点 2 上(build 个目标)。
+     1>InitializeBuildStatus:
+         正在创建“Debug\speechMatchDLL.unsuccessfulbuild”，因为已指定“AlwaysCreate”。
+       ClCompile:
+         所有输出均为最新。
+         所有输出均为最新。
+         C:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\bin\CL.exe /c /I"C:\Program Files (x86)\Visual Leak Detector\include" /ZI /nologo /W3 /WX- /Od /Oy- /D WIN32 /D _DEBUG /D _WINDOWS /D _USRDLL /D SPEECHMATCHDLL_EXPORTS /D _WINDLL /D _UNICODE /D UNICODE /Gm /EHsc /RTC1 /MTd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Yu"StdAfx.h" /Fp"Debug\speechMatchDLL.pch" /Fo"Debug\\" /Fd"Debug\vc100.pdb" /Gd /TP /analyze- /errorReport:prompt speechMatch.cpp
+         speechMatch.cpp
+     1>d:\speech_match\speechmatch-最终备份-20160517\speechmatchdll\speechmatchdll\speechmatchdll\speechmatch.cpp(42): warning C4305: “初始化”: 从“double”到“float”截断
+     1>d:\speech_match\speechmatch-最终备份-20160517\speechmatchdll\speechmatchdll\speechmatchdll\speechmatch.cpp(76): warning C4996: 'fopen': This function or variable may be unsafe. Consider using fopen_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+                 c:\program files (x86)\microsoft visual studio 10.0\vc\include\stdio.h(234) : 参见“fopen”的声明
+     1>d:\speech_match\speechmatch-最终备份-20160517\speechmatchdll\speechmatchdll\speechmatchdll\speechmatch.cpp(260): warning C4244: “初始化”: 从“double”转换到“float”，可能丢失数据
+     1>d:\speech_match\speechmatch-最终备份-20160517\speechmatchdll\speechmatchdll\speechmatchdll\speechmatch.cpp(361): warning C4996: 'fopen': This function or variable may be unsafe. Consider using fopen_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+                 c:\program files (x86)\microsoft visual studio 10.0\vc\include\stdio.h(234) : 参见“fopen”的声明
+     1>d:\speech_match\speechmatch-最终备份-20160517\speechmatchdll\speechmatchdll\speechmatchdll\speechmatch.cpp(528): warning C4244: “初始化”: 从“double”转换到“float”，可能丢失数据
+     1>d:\speech_match\speechmatch-最终备份-20160517\speechmatchdll\speechmatchdll\speechmatchdll\speechmatch.cpp(746): warning C4244: “初始化”: 从“double”转换到“float”，可能丢失数据
+     1>d:\speech_match\speechmatch-最终备份-20160517\speechmatchdll\speechmatchdll\speechmatchdll\speechmatch.cpp(916): warning C4244: “初始化”: 从“double”转换到“float”，可能丢失数据
+     1>d:\speech_match\speechmatch-最终备份-20160517\speechmatchdll\speechmatchdll\speechmatchdll\speechmatch.cpp(954): warning C4996: 'fopen': This function or variable may be unsafe. Consider using fopen_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+                 c:\program files (x86)\microsoft visual studio 10.0\vc\include\stdio.h(234) : 参见“fopen”的声明
+     1>d:\speech_match\speechmatch-最终备份-20160517\speechmatchdll\speechmatchdll\speechmatchdll\speechmatch.cpp(1074): warning C4244: “初始化”: 从“double”转换到“float”，可能丢失数据
+     1>d:\speech_match\speechmatch-最终备份-20160517\speechmatchdll\speechmatchdll\speechmatchdll\speechmatch.cpp(1085): warning C4244: “初始化”: 从“double”转换到“float”，可能丢失数据
+     1>d:\speech_match\speechmatch-最终备份-20160517\speechmatchdll\speechmatchdll\speechmatchdll\speechmatch.cpp(1127): warning C4996: 'fopen': This function or variable may be unsafe. Consider using fopen_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+                 c:\program files (x86)\microsoft visual studio 10.0\vc\include\stdio.h(234) : 参见“fopen”的声明
+     1>d:\speech_match\speechmatch-最终备份-20160517\speechmatchdll\speechmatchdll\speechmatchdll\speechmatch.cpp(1235): warning C4244: “初始化”: 从“double”转换到“float”，可能丢失数据
+     1>d:\speech_match\speechmatch-最终备份-20160517\speechmatchdll\speechmatchdll\speechmatchdll\speechmatch.cpp(1365): warning C4244: “=”: 从“int”转换到“float”，可能丢失数据
+     1>d:\speech_match\speechmatch-最终备份-20160517\speechmatchdll\speechmatchdll\speechmatchdll\speechmatch.cpp(1475): warning C4244: “参数”: 从“unsigned __int64”转换到“unsigned int”，可能丢失数据
+     1>d:\speech_match\speechmatch-最终备份-20160517\speechmatchdll\speechmatchdll\speechmatchdll\speechmatch.cpp(1476): warning C4244: “参数”: 从“unsigned __int64”转换到“unsigned int”，可能丢失数据
+     1>d:\speech_match\speechmatch-最终备份-20160517\speechmatchdll\speechmatchdll\speechmatchdll\speechmatch.cpp(1680): warning C4996: 'fopen': This function or variable may be unsafe. Consider using fopen_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+                 c:\program files (x86)\microsoft visual studio 10.0\vc\include\stdio.h(234) : 参见“fopen”的声明
+     1>d:\speech_match\speechmatch-最终备份-20160517\speechmatchdll\speechmatchdll\speechmatchdll\speechmatch.cpp(1860): warning C4996: 'fopen': This function or variable may be unsafe. Consider using fopen_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+                 c:\program files (x86)\microsoft visual studio 10.0\vc\include\stdio.h(234) : 参见“fopen”的声明
+       ManifestResourceCompile:
+         所有输出均为最新。
+       Link:
+         C:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\bin\link.exe /ERRORREPORT:PROMPT /OUT:"D:\speech_match\speechmatch-最终备份-20160517\speechMatchDLL\speechMatchDLL\Debug\speechMatchDLL.dll" /INCREMENTAL /NOLOGO /LIBPATH:"C:\Program Files (x86)\Visual Leak Detector\lib\Win32" /MANIFEST /ManifestFile:"Debug\speechMatchDLL.dll.intermediate.manifest" /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /DEBUG /PDB:"D:\speech_match\speechmatch-最终备份-20160517\speechMatchDLL\speechMatchDLL\Debug\speechMatchDLL.pdb" /SUBSYSTEM:WINDOWS /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"D:\speech_match\speechmatch-最终备份-20160517\speechMatchDLL\speechMatchDLL\Debug\speechMatchDLL.lib" /MACHINE:X86 /DLL Debug\speechMatchDLL.dll.embed.manifest.res
+         Debug\dllmain.obj
+         Debug\speechMatch.obj
+         Debug\stdafx.obj
+       Manifest:
+         c:\Program Files (x86)\Microsoft SDKs\Windows\v7.0A\bin\mt.exe /nologo /verbose /out:"Debug\speechMatchDLL.dll.embed.manifest" /manifest Debug\speechMatchDLL.dll.intermediate.manifest "C:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\Include\Manifest\dpiaware.manifest"
+         所有输出均为最新。
+       LinkEmbedManifest:
+         所有输出均为最新。
+         speechMatchDLL.vcxproj -> D:\speech_match\speechmatch-最终备份-20160517\speechMatchDLL\speechMatchDLL\Debug\speechMatchDLL.dll
+       FinalizeBuildStatus:
+         正在删除文件“Debug\speechMatchDLL.unsuccessfulbuild”。
+         正在对“Debug\speechMatchDLL.lastbuildstate”执行 Touch 任务。
+     1>已完成生成项目“D:\speech_match\speechmatch-最终备份-20160517\speechMatchDLL\speechMatchDLL\speechMatchDLL\speechMatchDLL.vcxproj”(build 个目标)的操作。
+
+生成成功。
+
+已用时间 00:00:12.38
