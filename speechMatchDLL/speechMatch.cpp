@@ -264,21 +264,30 @@ int ReadFileLength(const char *wfile, int* sampleRate)
 
 
 
-/*
-	// 两个小语音对齐  几秒~几分钟的小语音之间的对齐 
-	// 
-*/
+/*********************************************************************
+*
+*  //Description: 两个小语音对齐（语音长度几秒到几分钟左右）
+				// 对齐精度1ms以内 
+*
+*  Parameters : file1：语音1路径
+*				file2：语音2路径
+*				bb：结果b
+*  Returns    : 返回错误代码
+*				0：对齐正常
+*				-1：采样率错误
+*				其他：读取wav失败
+
+*********************************************************************/
+
 #ifdef __cplusplus  
 extern "C" {
-#endif  
+#endif 
 	__declspec(dllexport)  int speechMatch_small(const char *file1, const char *file2, double &bb)
 	{
 
 		int ret = 0;
-		const int max_pos_frame = 180 * SAMPRATE; // wav1和wav2的最大偏移不超过3分钟
 
-		//读取标杆语音的长度和采样率 然后short数！
-		printf("read wav_1:%s\nread wav_2:%s\n", file1, file2);
+		// 记录语音的bak信息 
 		int len_wav_1 = ReadFileLength(file1, &sampleRate);
 		int len_wav_2 = ReadFileLength(file2, &sampleRate);
 		if (sampleRate != SAMPRATE)
@@ -286,18 +295,23 @@ extern "C" {
 			printf("[sampleRate:%d != 16000] !\n", sampleRate);
 			return -1;
 		}
+		int bak_len_wav1 = len_wav_1;
+		int bak_len_wav2 = len_wav_2;
 
 		double time_wav_1 = double(len_wav_1) / double(SAMPRATE);
 		double time_wav_2 = double(len_wav_2) / double(SAMPRATE);
-		printf("wav_1=%fs\twav_2=%fs\n", time_wav_1, time_wav_2);
+		double bak_time_wav1 = time_wav_1;
+		double bak_time_wav2 = time_wav_2;
+		printf("read wav_1=%fs\twav_2=%fs\n", time_wav_1, time_wav_2);
 
-		int bias_wav_1 = int(time_wav_1 * double(SAMPRATE) / 3.3);   // 从第bias_wav_1 帧开始读取 wav1的数据段！ 
-		time_wav_1 = time_wav_1 / 5 > 600 ? 600 : time_wav_1 / 5;
-		//time_wav_1 = 60.0;
-
+		// 从第bias_wav_1 帧开始读取 len/3 的数据段！ 
+		int bias_wav_1 = int(time_wav_1 * double(SAMPRATE) / 3.3);
+		time_wav_1 = time_wav_1 / 3.0 > 600 ? 600 : time_wav_1 / 3.0;
 		len_wav_1 = int(time_wav_1*SAMPRATE);
 		short *data_wav1 = new short[len_wav_1];
-		printf("!!!!ReadFile:%s [%d:%d]!!!! \n", file1, bias_wav_1, len_wav_1);
+
+		printf("read_bit_len:wav=%s\tbias=%d\tread_len=%d] \n", file1, bias_wav_1, len_wav_1);
+
 		ret = ReadFile(file1, data_wav1, bias_wav_1, len_wav_1);
 		if (ret < 0)
 		{
@@ -310,7 +324,8 @@ extern "C" {
 		len_wav_2 -= 250;
 
 		short *data_wav2 = new short[len_wav_2];
-		printf("!!!!ReadFile:%s [%d:%d]!!!! \n", file2, bias_wav_2, len_wav_2);
+		//printf("!!!!ReadFile:%s [%d:%d]!!!! \n", file2, bias_wav_2, len_wav_2);
+		printf("read_bit_len:wav=%s\tbias=%d\tread_len=%d] \n", file2, bias_wav_2, len_wav_2);
 		ret = ReadFile(file2, data_wav2, bias_wav_2, len_wav_2);
 		if (ret < 0)
 		{
@@ -405,6 +420,51 @@ extern "C" {
 		bb = (double)(pos*FrmLen + (bias_wav_2 - bias_wav_1)) / 50.0 / FrmLen;
 
 
+		printf("============   开始精确对齐....  ============\n");
+		// y=ax+b   A语音的x时间点  对应B语音的ax+b 时间点
+		// 在A语音中间位置x处 取 能量大于一定值的 100ms 
+		// 在B语音的ax+b 左右100ms范围内查找。
+
+
+		int const_pos = 640;  // 40ms  
+
+		// A的开始采样点  中间附近  能量比较大的区域 
+		// 0007.wav  不包含 1/3 处 
+		int len_wav1_hhh = int(SAMPRATE *(bak_time_wav1 * 3.0 / 8.0));
+		int bias_wav1_hhh = int(bak_time_wav1 * double(SAMPRATE) * 2.0 / 8.0);
+		short *data_wav1_hhh = new short[len_wav1_hhh];
+		ret = ReadFile(file1, data_wav1_hhh, bias_wav1_hhh, len_wav1_hhh);
+
+		// 对应的B的区域  x+b 采样点对应 bias_wav1_hhh + b*SAMPRATE 
+		int bias_wav2_hhh = double(SAMPRATE) * (bb)+bias_wav1_hhh - const_pos;
+		int len_wav2_hhh = len_wav1_hhh + 2 * const_pos;
+		short *data_wav2_hhh = new short[len_wav2_hhh];
+		ret = ReadFile(file2, data_wav2_hhh, bias_wav2_hhh, len_wav2_hhh);
+
+		// B的区域内移动  计算
+		int fram_move_hhh = len_wav2_hhh - len_wav1_hhh;
+		float *score_hhh = new float[fram_move_hhh];
+
+		float score_max = 0.0;
+		for (int pole = 0; pole < fram_move_hhh; pole++)
+		{
+			score_hhh[pole] = 0;
+			for (int jj = 0; jj<len_wav1_hhh; jj++)
+			{
+				float count = data_wav1_hhh[jj] * data_wav2_hhh[pole + jj]
+					/ float(len_wav1_hhh);
+				score_hhh[pole] += count;
+
+			}
+		}
+
+		// A语音的x采样点  对应b语音的: 
+		int pos_hhh = findLocalMaximum(score_hhh, fram_move_hhh);
+		pos_hhh = bias_wav2_hhh + pos_hhh - bias_wav1_hhh;
+		printf("pos_hhh=%d\n", pos_hhh);
+		bb = double(pos_hhh) / double(SAMPRATE);
+
+
 		delete[] data_wav1;
 		delete[] data_wav2;
 		delete[] data_scaled_wav1;
@@ -414,10 +474,13 @@ extern "C" {
 		delete[] cep_part_2;
 
 		return 0;
+
+
 	}
 #ifdef __cplusplus  
 }
 #endif 
+
 
 
 /*********************************************************************
