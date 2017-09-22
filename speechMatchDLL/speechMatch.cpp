@@ -60,10 +60,381 @@ vector<complex<double>> vecList;//FFT计算之后的数据
 //vector<double>MFCCcoefficient;
 
 
+////////////////////////////////////////////////////////////////////////////////////////////
 
 /*
-	大语音对齐：y=ax+b 
+// 从bias处开始读取 halfWindow 个short， 如果不够，返回-1。
 */
+int ReadFile(const char *wfile, short* allbuf, int bias, int halfWindow)
+{
+	bool oflag = false;
+	FILE *fp = NULL;
+	WAVEHEAD head;
+	int SAMFREQ = -1;
+	int sample_count = 0, channel_num = 0, readflag = 0;
+	int numSample = 0;//读数据长度
+	try
+	{
+		//判断声音文件
+		//if (strstr(wfile, ".wav")) {
+		if (true) 
+		{
+			fp = fopen(wfile, "rb");
+			if (fp == NULL) {
+				return -2;
+			}
+			oflag = true;
+			fseek(fp, 0, SEEK_END);
+			sample_count = ftell(fp) - sizeof(WAVEHEAD);
+			fseek(fp, 0, SEEK_SET);
+			fread(&head, 1, sizeof(WAVEHEAD), fp);
+			//data
+			if (head.data[0] != 'd'&&head.data[1] != 'a'&&head.data[2] != 't'&&head.data[3] != 'a')
+			{
+				fclose(fp);
+				return -3;
+			}
+			//RIFF
+			if (head.riff[0] != 'R'&&head.riff[1] != 'I'&&head.riff[2] != 'F'&&head.riff[3] != 'F')
+			{
+				fclose(fp);
+				return -3;
+			}
+			//"WAVEfmt "
+			if (head.wav[0] != 'W'&&head.wav[1] != 'A'&&head.wav[2] != 'V'&&head.wav[3] != 'E'&&head.wav[4] != 'f'&&head.wav[5] != 'm'&&head.wav[6] != 't'&&head.wav[7] != ' ')
+			{
+				fclose(fp);
+				return -3;
+			}
+			//定位数据
+			fseek(fp, (long)(head.t1 - 16) - 4, SEEK_CUR);
+			fread(&head.sumbytes, 1, sizeof(long), fp);
+			//得到字节数
+			sample_count = head.sumbytes;
+			if (head.samplerate>48000 || head.samplerate<0)
+			{
+				fclose(fp);
+				exit(-1);
+			}
+			SAMFREQ = head.samplerate;
+			channel_num = head.channels;
+		}
+		//得到样本数（n个通道样本数和，且为16bit）
+		sample_count /= sizeof(short);
+		if (sample_count % channel_num != 0) {
+			fclose(fp);
+			return -4;
+		}
+		// 分配空间读取数据
+		// 从bias的开始读取 halfWindow 个short， 如果不够，返回-1。
+		printf("bias=%d\tsample_count=%d\thalfWindow=%d\n", bias, sample_count, halfWindow);
+		if (bias + halfWindow <= sample_count)
+		{
+			numSample = halfWindow;
+		}
+		else
+		{
+			return -5;
+		}
+		//allbuf = (short*)malloc(numSample * sizeof(short));
+		fseek(fp, bias*sizeof(short), SEEK_CUR);
+		fread(allbuf, sizeof(short), numSample, fp);
+
+		fclose(fp);
+		oflag = false;
+	}
+	catch (...)
+	{
+		if (oflag)
+		{
+			fclose(fp);
+		}
+		//if(allbuf)free(allbuf);
+		//allbuf=NULL;
+		return -6;
+
+	}
+	return 0;
+}
+
+
+/*
+获取语音的基础信息：采样率、长度
+*/
+int ReadFileLength(const char *wfile, int* sampleRate)
+{
+	bool oflag = false;
+	FILE *fp = NULL;
+	WAVEHEAD head;
+	int SAMFREQ = -1;
+	int sample_count = 0, channel_num = 0, readflag = 0;
+	int numSample = 0;//读数据长度
+	try
+	{
+		//判断声音文件
+		//if (strstr(wfile, ".wav")) {
+		if (true) 
+		{
+			fp = fopen(wfile, "rb");
+			if (fp == NULL) {
+				printf("read %s err!\n", wfile);
+				return -1;
+			}
+			printf("open file ok!\n");
+
+			oflag = true;
+			fseek(fp, 0, SEEK_END);
+			sample_count = ftell(fp) - sizeof(WAVEHEAD);
+			fseek(fp, 0, SEEK_SET);
+			fread(&head, 1, sizeof(WAVEHEAD), fp);
+			//data
+			if (head.data[0] != 'd'&&head.data[1] != 'a'&&head.data[2] != 't'&&head.data[3] != 'a')
+			{
+				fclose(fp);
+				printf("read data err!\n");
+				return -1;
+			}
+			//RIFF
+			if (head.riff[0] != 'R'&&head.riff[1] != 'I'&&head.riff[2] != 'F'&&head.riff[3] != 'F')
+			{
+				fclose(fp);
+				printf("read RIFF err!\n");
+				return -1;
+			}
+			//"WAVEfmt "
+			if (head.wav[0] != 'W'&&head.wav[1] != 'A'&&head.wav[2] != 'V'&&head.wav[3] != 'E'&&head.wav[4] != 'f'&&head.wav[5] != 'm'&&head.wav[6] != 't'&&head.wav[7] != ' ')
+			{
+				fclose(fp);
+				printf("read WAVEfmt err!\n");
+				return -1;
+			}
+			//定位数据
+			fseek(fp, (long)(head.t1 - 16) - 4, SEEK_CUR);
+			fread(&head.sumbytes, 1, sizeof(long), fp);
+			//得到字节数
+			sample_count = head.sumbytes;
+			if (head.samplerate>48000 || head.samplerate<0)
+			{
+				fclose(fp);
+				exit(-1);
+			}
+			SAMFREQ = head.samplerate;
+			channel_num = head.channels;
+
+			*sampleRate = SAMFREQ;
+		}
+		//得到样本数（n个通道样本数和，且为16bit）
+		sample_count /= sizeof(short);
+		if (sample_count % channel_num != 0) {
+			fclose(fp);
+			printf("read channel err!\n");
+			return -2;
+		}
+		/*//分配空间读取数据
+		if (bias+MAX<sample_count)
+		{
+		numSample = MAX;
+		}
+		else
+		{
+		numSample = sample_count-bias;
+		}
+		allbuf = (short*)malloc(numSample * sizeof(short));
+		fread(allbuf, sizeof(short), numSample,fp+bias);
+		fclose(fp);
+		oflag=false;*/
+
+		fclose(fp);
+		return sample_count;
+	}
+	catch (...)
+	{
+		if (oflag)
+			fclose(fp);
+
+		/*if(allbuf)free(allbuf);
+		allbuf=NULL;*/
+		return -1;
+
+	}
+
+	fclose(fp);
+	return 0;
+}
+
+
+
+/*
+	// 两个小语音对齐  几秒~几分钟的小语音之间的对齐 
+	// 
+*/
+#ifdef __cplusplus  
+extern "C" {
+#endif  
+	__declspec(dllexport)  int speechMatch_small(const char *file1, const char *file2, double &bb)
+	{
+
+		int ret = 0;
+		const int max_pos_frame = 180 * SAMPRATE; // wav1和wav2的最大偏移不超过3分钟
+
+		//读取标杆语音的长度和采样率 然后short数！
+		printf("read wav_1:%s\nread wav_2:%s\n", file1, file2);
+		int len_wav_1 = ReadFileLength(file1, &sampleRate);
+		int len_wav_2 = ReadFileLength(file2, &sampleRate);
+		if (sampleRate != SAMPRATE)
+		{
+			printf("[sampleRate:%d != 16000] !\n", sampleRate);
+			return -1;
+		}
+
+		double time_wav_1 = double(len_wav_1) / double(SAMPRATE);
+		double time_wav_2 = double(len_wav_2) / double(SAMPRATE);
+		printf("wav_1=%fs\twav_2=%fs\n", time_wav_1, time_wav_2);
+
+		int bias_wav_1 = int(time_wav_1 * double(SAMPRATE) / 3.3);   // 从第bias_wav_1 帧开始读取 wav1的数据段！ 
+		time_wav_1 = time_wav_1 / 5 > 600 ? 600 : time_wav_1 / 5;
+		//time_wav_1 = 60.0;
+
+		len_wav_1 = int(time_wav_1*SAMPRATE);
+		short *data_wav1 = new short[len_wav_1];
+		printf("!!!!ReadFile:%s [%d:%d]!!!! \n", file1, bias_wav_1, len_wav_1);
+		ret = ReadFile(file1, data_wav1, bias_wav_1, len_wav_1);
+		if (ret < 0)
+		{
+			printf("ReadFile:%s error!\n", file1);
+			return -2;
+		}
+
+
+		int bias_wav_2 = 0;
+		len_wav_2 -= 250;
+
+		short *data_wav2 = new short[len_wav_2];
+		printf("!!!!ReadFile:%s [%d:%d]!!!! \n", file2, bias_wav_2, len_wav_2);
+		ret = ReadFile(file2, data_wav2, bias_wav_2, len_wav_2);
+		if (ret < 0)
+		{
+			printf("ReadFile:%s error!\n", file2);
+			return -2;
+		}
+		printf("wav_time[%f:%f]秒\n", double(bias_wav_1) / SAMPRATE, double(len_wav_1) / SAMPRATE);
+		printf("wav_time[%f:%f]秒\n", double(bias_wav_2) / SAMPRATE, double(len_wav_2) / SAMPRATE);
+
+
+		// 一帧=20ms	1s=50帧	； 一帧=16*20个short
+		int FrmNum_wav_1 = len_wav_1 / FrmLen;
+		int FrmNum_wav_2 = len_wav_2 / FrmLen;
+
+		int len_window = FrmNum_wav_1;  // 截取的 对比帧 段数
+		int fram_move = FrmNum_wav_2 - FrmNum_wav_1; // 左右移动的范围
+		float *score = new float[fram_move];
+		double *cep_part_1 = new double[(PCEP - 1)*FrmNum_wav_1];
+		double *cep_part_2 = new double[(PCEP - 1)*FrmNum_wav_2];
+
+		float *data_scaled_wav1 = new float[len_wav_1];
+		float *data_scaled_wav2 = new float[len_wav_2];
+
+		DataScaling(data_wav1, data_scaled_wav1, len_wav_1);
+		DataScaling(data_wav2, data_scaled_wav2, len_wav_2);
+
+
+		InitHamming();//初始化汉明窗
+		InitFilt(FiltCoe1, FiltCoe2, Num); //初始化MEL滤波系数
+		double En[FiltNum + 1];         //频带能量
+		double Cep_wav_1[PCEP];//MFCC结果
+		double Cep_wav_2[PCEP];//MFCC结果	
+
+		for (int frame = 0; frame<FrmNum_wav_1; frame++) // 每一帧
+		{
+			//拿到一帧数据
+			for (int j = 0; j < FrmLen; j++)
+			{
+				dBuff_wav_1[j] = (double)data_scaled_wav1[frame*FrmLen + j];
+
+			}
+			// 针对一帧的数据进行处理
+			preemphasis(dBuff_wav_1, resultReference, FrmLen); //预加重结果存在result里面
+			HammingWindow(resultReference, dataReference); //给一帧数据加窗,存在data里面
+			compute_fft(dataReference, vecList);
+			CFilt(dataReference, FiltCoe1, FiltCoe2, Num, En, vecList);
+			MFCC(En, Cep_wav_1);
+			vecList.clear();
+
+			for (int tick = 0; tick<PCEP - 1; tick++)  // 这一帧的12个mfcc系数
+			{
+				// 每一帧数据依次排列
+				cep_part_1[frame*(PCEP - 1) + tick] = Cep_wav_1[tick + 1];
+			}
+		}
+
+		for (int frame = 0; frame<FrmNum_wav_2; frame++) // 每一帧
+		{
+			//拿到一帧数据
+			for (int j = 0; j < FrmLen; j++)
+			{
+				dBuff_wav_2[j] = (double)data_scaled_wav2[frame * FrmLen + j];
+			}
+			// 针对一帧的数据进行处理
+			preemphasis(dBuff_wav_2, resultRaw, FrmLen);
+			HammingWindow(resultRaw, dataRaw);
+			compute_fft(dataRaw, vecList);
+			CFilt(dataRaw, FiltCoe1, FiltCoe2, Num, En, vecList);
+			MFCC(En, Cep_wav_2);
+			vecList.clear();
+
+			for (int tick = 0; tick<PCEP - 1; tick++)  // 这一帧的12个mfcc系数
+			{
+				cep_part_2[frame*(PCEP - 1) + tick] = Cep_wav_2[tick + 1];
+			}
+		}
+
+		//printf("窗 左右移动的帧数=%d\n", fram_move);
+		for (int pole = 0; pole < fram_move; pole++)
+		{
+			score[pole] = 0;
+			for (int jj = 0; jj<len_window*(PCEP - 1); jj++)
+			{
+				float count = cep_part_1[jj] * cep_part_2[pole*(PCEP - 1) + jj] / float(len_window*(PCEP - 1));
+				score[pole] += count;
+
+			}
+
+		}
+
+		float pos = findLocalMaximum(score, fram_move); // 代表 len_window 在 wav2中的对齐点位置。	
+		bb = (double)(pos*FrmLen + (bias_wav_2 - bias_wav_1)) / 50.0 / FrmLen;
+
+
+		delete[] data_wav1;
+		delete[] data_wav2;
+		delete[] data_scaled_wav1;
+		delete[] data_scaled_wav2;
+		delete[] score;
+		delete[] cep_part_1;
+		delete[] cep_part_2;
+
+		return 0;
+	}
+#ifdef __cplusplus  
+}
+#endif 
+
+
+/*********************************************************************
+*
+*  Description: 大语音对齐 y=ax+b
+*				较小的语音中选取中间3段 去另一个语音中查找
+*  Parameters : file1：语音1路径
+*				file2：语音2路径
+*				aa：结果a
+*				bb：结果b
+*  Returns    : 返回错误代码
+*				0：对齐正常
+*				-1：采样率错误
+*				1：a != 1
+*				其他：读取wav失败
+
+*********************************************************************/
 
 #ifdef __cplusplus  
 extern "C" {  
@@ -347,9 +718,21 @@ __declspec(dllexport)  int speechMatch_a(const char *file1, const char *file2, d
 #endif  
 
 
-/*
-	大语音对齐：y=ax+b  适应两个语音长度差距比较大的  计算时间比较长。
-*/
+/*********************************************************************
+*
+*  Description: 大语音对齐 y=ax+b
+*				大语音对齐：y=ax+b  适应两个语音长度差距比较大的  计算时间比较长。
+*  Parameters : file1：语音1路径
+*				file2：语音2路径
+*				aa：结果a
+*				bb：结果b
+*  Returns    : 返回错误代码
+*				0：对齐正常
+*				-1：采样率错误
+*				1：a != 1
+*				其他：读取wav失败
+
+*********************************************************************/
 
 #ifdef __cplusplus  
 extern "C" {  
@@ -615,159 +998,7 @@ __declspec(dllexport)  int speechMatch_a_long(const char *file1, const char *fil
 #endif 
 
 
-/*
-	两个小语音对齐
-*/
-#ifdef __cplusplus  
-extern "C" {
-#endif  
-	__declspec(dllexport)  int speechMatch_small(const char *file1, const char *file2, double &bb)
-	{
-
-		int ret = 0;
-		const int max_pos_frame = 180 * SAMPRATE; // wav1和wav2的最大偏移不超过3分钟
-
-		//读取标杆语音的长度和采样率 然后short数！
-		printf("read wav_1:%s\nread wav_2:%s\n", file1, file2);
-		int len_wav_1 = ReadFileLength(file1, &sampleRate);
-		int len_wav_2 = ReadFileLength(file2, &sampleRate);
-		if (sampleRate != SAMPRATE)
-		{
-			printf("[sampleRate:%d != 16000] !\n", sampleRate);
-			return -1;
-		}
-
-		double time_wav_1 = double(len_wav_1) / double(SAMPRATE);
-		double time_wav_2 = double(len_wav_2) / double(SAMPRATE);
-		printf("wav_1=%fs\twav_2=%fs\n", time_wav_1, time_wav_2);
-
-		int bias_wav_1 = int(time_wav_1 * double(SAMPRATE) / 3.3);   // 从第bias_wav_1 帧开始读取 wav1的数据段！ 
-		time_wav_1 = time_wav_1 / 5 > 600 ? 600 : time_wav_1 / 5;
-		//time_wav_1 = 60.0;
-
-		len_wav_1 = int(time_wav_1*SAMPRATE);
-		short *data_wav1 = new short[len_wav_1];
-		printf("!!!!ReadFile:%s [%d:%d]!!!! \n", file1, bias_wav_1,len_wav_1);
-		ret = ReadFile(file1, data_wav1, bias_wav_1, len_wav_1);
-		if (ret < 0)
-		{
-			printf("ReadFile:%s error!\n", file1);
-			return -2;
-		}
-
-
-		int bias_wav_2 = 0;
-		len_wav_2 -= 250;
-
-		short *data_wav2 = new short[len_wav_2];
-		printf("!!!!ReadFile:%s [%d:%d]!!!! \n", file2, bias_wav_2, len_wav_2);
-		ret = ReadFile(file2, data_wav2, bias_wav_2, len_wav_2);
-		if (ret < 0)
-		{
-			printf("ReadFile:%s error!\n", file2);
-			return -2;
-		}
-		printf("wav_time[%f:%f]秒\n", double(bias_wav_1) / SAMPRATE, double(len_wav_1) / SAMPRATE);
-		printf("wav_time[%f:%f]秒\n", double(bias_wav_2) / SAMPRATE, double(len_wav_2) / SAMPRATE);
-
-
-		// 一帧=20ms	1s=50帧	； 一帧=16*20个short
-		int FrmNum_wav_1 = len_wav_1 / FrmLen;
-		int FrmNum_wav_2 = len_wav_2 / FrmLen;
-
-		int len_window = FrmNum_wav_1;  // 截取的 对比帧 段数
-		int fram_move = FrmNum_wav_2 - FrmNum_wav_1; // 左右移动的范围
-		float *score = new float[fram_move];
-		double *cep_part_1 = new double[(PCEP - 1)*FrmNum_wav_1];
-		double *cep_part_2 = new double[(PCEP - 1)*FrmNum_wav_2];
-
-		float *data_scaled_wav1 = new float[len_wav_1];
-		float *data_scaled_wav2 = new float[len_wav_2];
-
-		DataScaling(data_wav1, data_scaled_wav1, len_wav_1);
-		DataScaling(data_wav2, data_scaled_wav2, len_wav_2);
-
-
-		InitHamming();//初始化汉明窗
-		InitFilt(FiltCoe1, FiltCoe2, Num); //初始化MEL滤波系数
-		double En[FiltNum + 1];         //频带能量
-		double Cep_wav_1[PCEP];//MFCC结果
-		double Cep_wav_2[PCEP];//MFCC结果	
-
-		for (int frame = 0; frame<FrmNum_wav_1; frame++) // 每一帧
-		{
-			//拿到一帧数据
-			for (int j = 0; j < FrmLen; j++)
-			{
-				dBuff_wav_1[j] = (double)data_scaled_wav1[frame*FrmLen + j];
-
-			}
-			// 针对一帧的数据进行处理
-			preemphasis(dBuff_wav_1, resultReference, FrmLen); //预加重结果存在result里面
-			HammingWindow(resultReference, dataReference); //给一帧数据加窗,存在data里面
-			compute_fft(dataReference, vecList);
-			CFilt(dataReference, FiltCoe1, FiltCoe2, Num, En, vecList);
-			MFCC(En, Cep_wav_1);
-			vecList.clear();
-
-			for (int tick = 0; tick<PCEP - 1; tick++)  // 这一帧的12个mfcc系数
-			{
-				// 每一帧数据依次排列
-				cep_part_1[frame*(PCEP - 1) + tick] = Cep_wav_1[tick + 1];
-			}
-		}
-
-		for (int frame = 0; frame<FrmNum_wav_2; frame++) // 每一帧
-		{
-			//拿到一帧数据
-			for (int j = 0; j < FrmLen; j++)
-			{
-				dBuff_wav_2[j] = (double)data_scaled_wav2[frame * FrmLen + j];
-			}
-			// 针对一帧的数据进行处理
-			preemphasis(dBuff_wav_2, resultRaw, FrmLen);
-			HammingWindow(resultRaw, dataRaw);
-			compute_fft(dataRaw, vecList);
-			CFilt(dataRaw, FiltCoe1, FiltCoe2, Num, En, vecList);
-			MFCC(En, Cep_wav_2);
-			vecList.clear();
-
-			for (int tick = 0; tick<PCEP - 1; tick++)  // 这一帧的12个mfcc系数
-			{
-				cep_part_2[frame*(PCEP - 1) + tick] = Cep_wav_2[tick + 1];
-			}
-		}
-
-		//printf("窗 左右移动的帧数=%d\n", fram_move);
-		for (int pole = 0; pole < fram_move; pole++)
-		{
-			score[pole] = 0;
-			for (int jj = 0; jj<len_window*(PCEP - 1); jj++)
-			{
-				float count = cep_part_1[jj] * cep_part_2[pole*(PCEP - 1) + jj] / float(len_window*(PCEP - 1));
-				score[pole] += count;
-
-			}
-
-		}
-
-		float pos = findLocalMaximum(score, fram_move); // 代表 len_window 在 wav2中的对齐点位置。	
-		bb = (double)(pos*FrmLen + (bias_wav_2 - bias_wav_1)) / 50.0 / FrmLen;
-
-
-		delete[] data_wav1;
-		delete[] data_wav2;
-		delete[] data_scaled_wav1;
-		delete[] data_scaled_wav2;
-		delete[] score;
-		delete[] cep_part_1;
-		delete[] cep_part_2;
-
-		return 0;
-	}
-#ifdef __cplusplus  
-}
-#endif  
+ 
 
 /*
 	两个大语音对齐 
@@ -1663,286 +1894,5 @@ void DataScaling(short* data, float* dataScaled, int halfWindow)
 	{
 		dataScaled[i] = data[i]/maxValue;
 	}
-}
-
-// 从bias处开始读取 halfWindow 个short， 如果不够，返回-1。
-int ReadFile(const char *wfile, short* allbuf, int bias, int halfWindow)
-{
-	bool oflag=false;
-	FILE *fp=NULL;
-	WAVEHEAD head;
-	int SAMFREQ=-1;
-	int sample_count=0,channel_num=0,readflag=0;
-	int numSample = 0;//读数据长度
-	try
-	{
-		//判断声音文件
-		if (strstr(wfile, ".wav")) {
-			fp=fopen(wfile, "rb");
-			if (fp == NULL) {
-				return -2;
-			}
-			oflag=true;
-			fseek(fp,0,SEEK_END);
-			sample_count = ftell(fp) - sizeof(WAVEHEAD);
-			fseek(fp,0,SEEK_SET);
-			fread(&head, 1, sizeof(WAVEHEAD), fp);
-			//data
-			if(head.data[0]!='d'&&head.data[1]!='a'&&head.data[2]!='t'&&head.data[3]!='a')
-			{
-				fclose(fp);
-				return -3;
-			}
-			//RIFF
-			if(head.riff[0]!='R'&&head.riff[1]!='I'&&head.riff[2]!='F'&&head.riff[3]!='F')
-			{
-				fclose(fp);
-				return -3;
-			}
-			//"WAVEfmt "
-			if(head.wav[0]!='W'&&head.wav[1]!='A'&&head.wav[2]!='V'&&head.wav[3]!='E'&&head.wav[4]!='f'&&head.wav[5]!='m'&&head.wav[6]!='t'&&head.wav[7]!=' ')
-			{
-				fclose(fp);
-				return -3;
-			}
-			//定位数据
-			fseek(fp,(long)(head.t1-16)-4,SEEK_CUR);
-			fread(&head.sumbytes,1,sizeof(long),fp);
-			//得到字节数
-			sample_count=head.sumbytes;
-			if(head.samplerate>48000||head.samplerate<0)
-			{
-				fclose(fp);
-				exit(-1);
-			}
-			SAMFREQ = head.samplerate;
-			channel_num = head.channels;
-		}
-		//得到样本数（n个通道样本数和，且为16bit）
-		sample_count /= sizeof(short);
-		if (sample_count % channel_num != 0) {
-			fclose(fp);
-			return -4;
-		}
-		// 分配空间读取数据
-		// 从bias的开始读取 halfWindow 个short， 如果不够，返回-1。
-		printf("bias=%d\tsample_count=%d\thalfWindow=%d\n",bias, sample_count,halfWindow);
-		if (bias + halfWindow <= sample_count)
-		{
-			numSample = halfWindow;
-		}
-		else
-		{
-			return -5;
-		}
-		//allbuf = (short*)malloc(numSample * sizeof(short));
-		fseek(fp, bias*sizeof(short), SEEK_CUR);
-		fread(allbuf, sizeof(short), numSample,fp);
-		
-		fclose(fp);
-		oflag=false;
-	}
-	catch(...)
-	{
-		if (oflag)
-		{
-			fclose(fp);
-		}
-		//if(allbuf)free(allbuf);
-		//allbuf=NULL;
-		return -6;
-
-	}
-	return 0;
-}
-
-/*
-// 从bias的中点开始读取 halfWindow*2 个short， 如果不够，读取 len-bias/2个。
-int ReadFile(const char *wfile, short* allbuf, int bias, int halfWindow)
-{
-	bool oflag=false;
-	FILE *fp=NULL;
-	WAVEHEAD head;
-	int SAMFREQ=-1;
-	int sample_count=0,channel_num=0,readflag=0;
-	int numSample = 0;//读数据长度
-	try
-	{
-		//判断声音文件
-		if (strstr(wfile, ".wav")) {
-			fp=fopen(wfile, "rb");
-			if (fp == NULL) {
-				return -1;
-			}
-			oflag=true;
-			fseek(fp,0,SEEK_END);
-			sample_count = ftell(fp) - sizeof(WAVEHEAD);
-			fseek(fp,0,SEEK_SET);
-			fread(&head, 1, sizeof(WAVEHEAD), fp);
-			//data
-			if(head.data[0]!='d'&&head.data[1]!='a'&&head.data[2]!='t'&&head.data[3]!='a')
-			{
-				fclose(fp);
-				return -1;
-			}
-			//RIFF
-			if(head.riff[0]!='R'&&head.riff[1]!='I'&&head.riff[2]!='F'&&head.riff[3]!='F')
-			{
-				fclose(fp);
-				return -1;
-			}
-			//"WAVEfmt "
-			if(head.wav[0]!='W'&&head.wav[1]!='A'&&head.wav[2]!='V'&&head.wav[3]!='E'&&head.wav[4]!='f'&&head.wav[5]!='m'&&head.wav[6]!='t'&&head.wav[7]!=' ')
-			{
-				fclose(fp);
-				return -1;
-			}
-			//定位数据
-			fseek(fp,(long)(head.t1-16)-4,SEEK_CUR);
-			fread(&head.sumbytes,1,sizeof(long),fp);
-			//得到字节数
-			sample_count=head.sumbytes;
-			if(head.samplerate>48000||head.samplerate<0)
-			{
-				fclose(fp);
-				exit(-1);
-			}
-			SAMFREQ = head.samplerate;
-			channel_num = head.channels;
-		}
-		//得到样本数（n个通道样本数和，且为16bit）
-		sample_count /= sizeof(short);
-		if (sample_count % channel_num != 0) {
-			fclose(fp);
-			return -2;
-		}
-		//分配空间读取数据
-		// 从bias的中点开始读取 halfWindow*2 个short， 如果不够，读取 len-bias/2个。
-		if (bias/2 + halfWindow*2 < sample_count)
-		{
-			numSample = halfWindow*2;
-		}
-		else
-		{
-			numSample = sample_count-bias/2;
-		}
-		//allbuf = (short*)malloc(numSample * sizeof(short));
-		fseek(fp, bias, SEEK_CUR);
-		fread(allbuf, sizeof(short), numSample,fp);
-		printf("read wav size:%d [short]\n", numSample);
-		fclose(fp);
-		oflag=false;
-	}
-	catch(...)
-	{
-		if(oflag)
-			fclose(fp);
-
-		if(allbuf)free(allbuf);
-		allbuf=NULL;
-		return -1;
-
-	}
-	return 0;
-}
-*/
-
-int ReadFileLength(const char *wfile,int* sampleRate)
-{
-	bool oflag=false;
-	FILE *fp=NULL;
-	WAVEHEAD head;
-	int SAMFREQ=-1;
-	int sample_count=0,channel_num=0,readflag=0;
-	int numSample = 0;//读数据长度
-	try
-	{
-		//判断声音文件
-		if (strstr(wfile, ".wav")) {
-			fp=fopen(wfile, "rb");
-			if (fp == NULL) {
-				printf("read %s err!\n", wfile);
-				return -1;
-			}
-			printf("open file ok!\n");
-
-			oflag=true;
-			fseek(fp,0,SEEK_END);
-			sample_count = ftell(fp) - sizeof(WAVEHEAD);
-			fseek(fp,0,SEEK_SET);
-			fread(&head, 1, sizeof(WAVEHEAD), fp);
-			//data
-			if(head.data[0]!='d'&&head.data[1]!='a'&&head.data[2]!='t'&&head.data[3]!='a')
-			{
-				fclose(fp);
-				printf("read data err!\n");
-				return -1;
-			}
-			//RIFF
-			if(head.riff[0]!='R'&&head.riff[1]!='I'&&head.riff[2]!='F'&&head.riff[3]!='F')
-			{
-				fclose(fp);
-				printf("read RIFF err!\n");
-				return -1;
-			}
-			//"WAVEfmt "
-			if(head.wav[0]!='W'&&head.wav[1]!='A'&&head.wav[2]!='V'&&head.wav[3]!='E'&&head.wav[4]!='f'&&head.wav[5]!='m'&&head.wav[6]!='t'&&head.wav[7]!=' ')
-			{
-				fclose(fp);
-				printf("read WAVEfmt err!\n");
-				return -1;
-			}
-			//定位数据
-			fseek(fp,(long)(head.t1-16)-4,SEEK_CUR);
-			fread(&head.sumbytes,1,sizeof(long),fp);
-			//得到字节数
-			sample_count=head.sumbytes;
-			if(head.samplerate>48000||head.samplerate<0)
-			{
-				fclose(fp);
-				exit(-1);
-			}
-			SAMFREQ = head.samplerate;
-			channel_num = head.channels;
-
-			*sampleRate = SAMFREQ;
-		}
-		//得到样本数（n个通道样本数和，且为16bit）
-		sample_count /= sizeof(short);
-		if (sample_count % channel_num != 0) {
-			fclose(fp);
-			printf("read channel err!\n");
-			return -2;
-		}
-		/*//分配空间读取数据
-		if (bias+MAX<sample_count)
-		{
-			numSample = MAX;
-		}
-		else
-		{
-			numSample = sample_count-bias;
-		}
-		allbuf = (short*)malloc(numSample * sizeof(short));
-		fread(allbuf, sizeof(short), numSample,fp+bias);
-		fclose(fp);
-		oflag=false;*/
-
-		fclose(fp);
-		return sample_count;
-	}
-	catch(...)
-	{
-		if(oflag)
-			fclose(fp);
-
-		/*if(allbuf)free(allbuf);
-		allbuf=NULL;*/
-		return -1;
-
-	}
-
-	fclose(fp);
-	return 0;
 }
 
