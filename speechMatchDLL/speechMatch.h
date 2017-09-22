@@ -13,9 +13,14 @@
 using namespace std;
 
   
+/*
+// 获取data中 能量最大的0.5s（或者1/4长度）数据段 的起始位置和长度
+*/
+int get_window(const short *data, int len_data, int &st_win, int &len_win);
 
 int ReadFile(const char *wavefile,short* allbuf, int bias, int halfWindow);
 int ReadFileLength(const char* wavefile,int* sampleRate);
+
 void DataScaling(short* data,float* dataScaled,int halfWindow);
 void InitHamming();
 void InitFilt(double *FiltCoe1, double *FiltCoe2, int *Num);
@@ -25,6 +30,7 @@ void compute_fft(double *data,vector<complex<double> >& vecList);
 void CFilt(double *spdata, double *FiltCoe1, double *FiltCoe2, int *Num, double *En,vector<complex<double> >& vecList);
 void MFCC(double* En, double* Cep);
 void FFT(const unsigned long & ulN, vector<complex<double> >& vecList);
+
 float findLocalMaximum(float* score,int length);
 void polyfit(int n,double *x,double *y,int poly_n,double a[]);
 void gauss_solve(int n,double A[],double x[],double b[]);

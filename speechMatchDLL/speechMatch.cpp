@@ -263,6 +263,37 @@ int ReadFileLength(const char *wfile, int* sampleRate)
 }
 
 
+/*
+	// 获取data中 能量最大的0.5s（或者1/4长度）数据段 的起始位置和长度 
+*/
+int get_window(const short *data, int len_data, int &st_win, int &len_win)
+{
+	int ret = 0;
+	short max_short = 30000;
+	int len_tmp1 = 15*SAMPRATE;   // 15s 数据长度 
+	int len_tmp2 = len_data / 4;   // 数据的 1/4 长度
+	int len_move = 0.01 * SAMPRATE;  // 移动10ms 
+	
+	st_win = 0;
+	double max_score = 0.0;
+
+	len_win = (len_tmp1 < len_tmp2) ? len_tmp1 : len_tmp2;
+
+	for (int ii = 0; ii < len_data - len_win; ii += len_move)
+	{
+		// 计算窗内能量 
+		double score = 0.0;
+		for (int jj = 0; jj < len_win; jj++)
+		{
+			score += pow(double(data[ii+jj]) / double(max_short), 2);
+		}
+		max_score = score > max_score ? score : max_score;
+		st_win = (score > max_score ?  ii : st_win);
+	}
+	
+
+	return ret;
+}
 
 /*********************************************************************
 *
@@ -464,6 +495,9 @@ extern "C" {
 		printf("pos_hhh=%d\n", pos_hhh);
 		bb = double(pos_hhh) / double(SAMPRATE);
 
+		delete[] data_wav1_hhh;
+		delete[] data_wav2_hhh;
+		delete[] score_hhh;
 
 		delete[] data_wav1;
 		delete[] data_wav2;
