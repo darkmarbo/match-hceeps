@@ -1,20 +1,22 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <LocalDebuggerCommand>D:\speech_match\speechmatch-最终备份-20160517\speechMatchDLLTest\speechMatchDLLTest\Release\speechMatchDLLTest.exe</LocalDebuggerCommand>
+    <LocalDebuggerCommand>D:\1-项目\1-bak-已经完成的项目\speech_match\speechmatch-最终备份-20160517\speechMatchDLLTest\speechMatchDLLTest\Release\speechMatchDLLTest.exe</LocalDebuggerCommand>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <LocalDebuggerCommandArguments>CH-CN_U0014_S0_and.wav  CH-CN_U0014_S0_ios.txt.wav speechMatch_a </LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>$(TargetFileName)  speechMatch_a</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+    <LocalDebuggerDebuggerType>Auto</LocalDebuggerDebuggerType>
+    <LocalDebuggerWorkingDirectory>..\..\..\speechMatchDLLTest\speechMatchDLLTest\Release</LocalDebuggerWorkingDirectory>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <LocalDebuggerCommand>D:\speech_match\speechmatch-最终备份-20160517\speechMatchDLLTest\speechMatchDLLTest\Release\speechMatchDLLTest.exe</LocalDebuggerCommand>
+    <LocalDebuggerCommand>D:\1-项目\1-bak-已经完成的项目\speech_match\speechmatch-最终备份-20160517\speechMatchDLLTest\speechMatchDLLTest\Debug\speechMatchDLLTest.exe</LocalDebuggerCommand>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <LocalDebuggerCommandArguments>CH-CN_U0014_S0_ios.txt.wav CH-CN_U0014_S0_and.wav </LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>$(TargetFileName) speechMatch_a</LocalDebuggerCommandArguments>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <LocalDebuggerWorkingDirectory>..</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerWorkingDirectory>..\Debug</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
 </Project>

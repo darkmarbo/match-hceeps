@@ -57,7 +57,7 @@ static double last=0;  //一窗数据最后一个点的值，此点用于预加重
 double dataReference[FrmLen];    //加窗后得到的数据
 double dataRaw[FrmLen];    //加窗后得到的数据
 vector<complex<double>> vecList;//FFT计算之后的数据
-vector<double>MFCCcoefficient;
+//vector<double>MFCCcoefficient;
 
 
 
@@ -70,6 +70,7 @@ extern "C" {
 #endif  
 __declspec(dllexport)  int speechMatch_a(const char *file1, const char *file2, double &aa, double &bb)
 {
+	int len_for_comp = 900;
 	int ret = 0;
 	const int numPart = 4;
 	FILE* fp_debug;		
@@ -135,7 +136,7 @@ __declspec(dllexport)  int speechMatch_a(const char *file1, const char *file2, d
 		// 计算读取 wav_1 的开始和长度
 		int bias_wav_1 = int(time_wav_1 * double(SAMPRATE) / numPart) * par;
 
-		time_wav_1 = time_wav_1/(numPart*2) > 60?60:time_wav_1/(numPart*2); 
+		time_wav_1 = time_wav_1 / (numPart * 2) > len_for_comp ? len_for_comp : time_wav_1 / (numPart * 2);
 		len_wav_1 = int(time_wav_1*SAMPRATE);
 		short *data_wav1 = new short[len_wav_1];
 		ret = ReadFile(file_a, data_wav1, bias_wav_1, len_wav_1);	
@@ -331,7 +332,7 @@ __declspec(dllexport)  int speechMatch_a(const char *file1, const char *file2, d
 		fclose(fp_debug);
 		fp_debug = NULL;
 	}
-	if(aa < 1.001 && aa > 0.999)
+	if(aa < 1.01 && aa > 0.99)
 	{
 		return 0;
 	}
@@ -1392,7 +1393,7 @@ void MFCC(double* En, double* Cep)
 			}
 
 		}
-		MFCCcoefficient.push_back(Cep[idcep]);
+		//MFCCcoefficient.push_back(Cep[idcep]);
 	}
 }
 
@@ -1743,11 +1744,12 @@ int ReadFile(const char *wfile, short* allbuf, int bias, int halfWindow)
 	}
 	catch(...)
 	{
-		if(oflag)
+		if (oflag)
+		{
 			fclose(fp);
-
-		if(allbuf)free(allbuf);
-		allbuf=NULL;
+		}
+		//if(allbuf)free(allbuf);
+		//allbuf=NULL;
 		return -6;
 
 	}
