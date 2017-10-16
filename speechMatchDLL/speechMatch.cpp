@@ -79,10 +79,19 @@ int ReadFile(const char *wfile, short* allbuf, int bias, int halfWindow)
 		//if (strstr(wfile, ".wav")) {
 		if (true) 
 		{
-			fp = fopen(wfile, "rb");
-			if (fp == NULL) {
+			//fp = fopen(wfile, "rb");
+			//if (fp == NULL) {
+			//	return -2;
+			//}
+
+			errno_t err;
+			if ((err = fopen_s(&fp, wfile, "rb")) != 0)
+			{
+				printf("The file was not opened\n");
 				return -2;
 			}
+
+
 			oflag = true;
 			fseek(fp, 0, SEEK_END);
 			sample_count = ftell(fp) - sizeof(WAVEHEAD);
@@ -140,7 +149,18 @@ int ReadFile(const char *wfile, short* allbuf, int bias, int halfWindow)
 		fseek(fp, bias*sizeof(short), SEEK_CUR);
 		fread(allbuf, sizeof(short), numSample, fp);
 
-		fclose(fp);
+		//fclose(fp);
+		if (fp)
+		{
+			while (fclose(fp))
+			{
+				printf("The file  was not closed\n");
+			}
+		}
+
+		// All other files are closed:
+		int numclosed = _fcloseall();
+		printf("Number of files closed by _fcloseall: %u\n", numclosed);
 		oflag = false;
 	}
 	catch (...)
@@ -149,10 +169,7 @@ int ReadFile(const char *wfile, short* allbuf, int bias, int halfWindow)
 		{
 			fclose(fp);
 		}
-		//if(allbuf)free(allbuf);
-		//allbuf=NULL;
 		return -6;
-
 	}
 	return 0;
 }
@@ -165,101 +182,106 @@ int ReadFileLength(const char *wfile, int* sampleRate)
 {
 	bool oflag = false;
 	FILE *fp = NULL;
+	
 	WAVEHEAD head;
 	int SAMFREQ = -1;
-	int sample_count = 0, channel_num = 0, readflag = 0;
+	int sample_count = -1, channel_num = 0, readflag = 0;
 	int numSample = 0;//读数据长度
-	try
+
+
+
+	//fp = fopen(wfile, "rb");
+	//if (fp == NULL) {
+	//	printf("read %s err!\n", wfile);
+	//	return -1;
+	//}
+	//printf("open file ok!\n");
+
+	errno_t err;
+	if ((err = fopen_s(&fp, wfile, "rb")) != 0)
 	{
-		//判断声音文件
-		//if (strstr(wfile, ".wav")) {
-		if (true) 
-		{
-			fp = fopen(wfile, "rb");
-			if (fp == NULL) {
-				printf("read %s err!\n", wfile);
-				return -1;
-			}
-			printf("open file ok!\n");
-
-			oflag = true;
-			fseek(fp, 0, SEEK_END);
-			sample_count = ftell(fp) - sizeof(WAVEHEAD);
-			fseek(fp, 0, SEEK_SET);
-			fread(&head, 1, sizeof(WAVEHEAD), fp);
-			//data
-			if (head.data[0] != 'd'&&head.data[1] != 'a'&&head.data[2] != 't'&&head.data[3] != 'a')
-			{
-				fclose(fp);
-				printf("read data err!\n");
-				return -1;
-			}
-			//RIFF
-			if (head.riff[0] != 'R'&&head.riff[1] != 'I'&&head.riff[2] != 'F'&&head.riff[3] != 'F')
-			{
-				fclose(fp);
-				printf("read RIFF err!\n");
-				return -1;
-			}
-			//"WAVEfmt "
-			if (head.wav[0] != 'W'&&head.wav[1] != 'A'&&head.wav[2] != 'V'&&head.wav[3] != 'E'&&head.wav[4] != 'f'&&head.wav[5] != 'm'&&head.wav[6] != 't'&&head.wav[7] != ' ')
-			{
-				fclose(fp);
-				printf("read WAVEfmt err!\n");
-				return -1;
-			}
-			//定位数据
-			fseek(fp, (long)(head.t1 - 16) - 4, SEEK_CUR);
-			fread(&head.sumbytes, 1, sizeof(long), fp);
-			//得到字节数
-			sample_count = head.sumbytes;
-			if (head.samplerate>48000 || head.samplerate<0)
-			{
-				fclose(fp);
-				exit(-1);
-			}
-			SAMFREQ = head.samplerate;
-			channel_num = head.channels;
-
-			*sampleRate = SAMFREQ;
-		}
-		//得到样本数（n个通道样本数和，且为16bit）
-		sample_count /= sizeof(short);
-		if (sample_count % channel_num != 0) {
-			fclose(fp);
-			printf("read channel err!\n");
-			return -2;
-		}
-		/*//分配空间读取数据
-		if (bias+MAX<sample_count)
-		{
-		numSample = MAX;
-		}
-		else
-		{
-		numSample = sample_count-bias;
-		}
-		allbuf = (short*)malloc(numSample * sizeof(short));
-		fread(allbuf, sizeof(short), numSample,fp+bias);
-		fclose(fp);
-		oflag=false;*/
-
-		fclose(fp);
-		return sample_count;
-	}
-	catch (...)
-	{
-		if (oflag)
-			fclose(fp);
-
-		/*if(allbuf)free(allbuf);
-		allbuf=NULL;*/
+		printf("The file was not opened\n");
 		return -1;
+	}		
 
+
+	oflag = true;
+	fseek(fp, 0, SEEK_END);
+	sample_count = ftell(fp) - sizeof(WAVEHEAD);
+	fseek(fp, 0, SEEK_SET);
+	fread(&head, 1, sizeof(WAVEHEAD), fp);
+	//data
+	if (head.data[0] != 'd'&&head.data[1] != 'a'&&head.data[2] != 't'&&head.data[3] != 'a')
+	{
+		fclose(fp);
+		fp = NULL;
+		printf("read data err!\n");
+		return -2;
+	}
+	//RIFF
+	if (head.riff[0] != 'R'&&head.riff[1] != 'I'&&head.riff[2] != 'F'&&head.riff[3] != 'F')
+	{
+		fclose(fp);
+		fp = NULL;
+		printf("read RIFF err!\n");
+		return -3;
+	}
+	//"WAVEfmt "
+	if (head.wav[0] != 'W'&&head.wav[1] != 'A'&&head.wav[2] != 'V'&&head.wav[3] != 'E'&&head.wav[4] != 'f'&&head.wav[5] != 'm'&&head.wav[6] != 't'&&head.wav[7] != ' ')
+	{
+		fclose(fp);
+		fp = NULL;
+		printf("read WAVEfmt err!\n");
+		return -4;
+	}
+	//定位数据
+	fseek(fp, (long)(head.t1 - 16) - 4, SEEK_CUR);
+	fread(&head.sumbytes, 1, sizeof(long), fp);
+	//得到字节数
+	sample_count = head.sumbytes;
+	if (head.samplerate>48000 || head.samplerate<0)
+	{
+		fclose(fp);
+		fp = NULL;
+		return -5;
+	}
+	SAMFREQ = head.samplerate;
+	channel_num = head.channels;
+
+	*sampleRate = SAMFREQ;
+	
+	//得到样本数（n个通道样本数和，且为16bit）
+	sample_count /= sizeof(short);
+	if (sample_count % channel_num != 0) 
+	{
+		fclose(fp);
+		fp = NULL;
+		printf("read channel err!\n");
+		return -6;
 	}
 
-	fclose(fp);
-	return 0;
+	//int ttt = -1;
+	//while (fp != NULL && (ttt=fclose(fp)) != 0)
+	//{
+	//	if (ttt == 0) fp = NULL;
+	//}
+
+	// 
+	if (fp)
+	{
+		while(fclose(fp))
+		{
+			printf("The file  was not closed\n");
+		}
+	}
+
+	// All other files are closed:
+	int numclosed = _fcloseall();
+	printf("Number of files closed by _fcloseall: %u\n", numclosed);
+
+	return sample_count;
+
+
 }
 
 
@@ -302,8 +324,8 @@ int get_window(const short *data, int len_data, int &st_win, int &len_win)
 	*/
 
 	// 使用原来的算法 
-	st_win = len_data / 3;
-	len_win = len_data / 3 ;
+	st_win = int(double(len_data) / 3.0);
+	len_win = int(double(len_data) / 3.0 );
 	
 
 	return ret;
@@ -355,6 +377,16 @@ extern "C" {
 		{
 			printf("[sampleRate:%d != 16000] !\n", sampleRate);
 			return -1;
+		}
+		if (bak_len_wav1 < 1)
+		{
+			printf("len_wav1 < 0 !\n");
+			return  bak_len_wav1 - 100;
+		}
+		if ( bak_len_wav2 < 1)
+		{
+			printf("len_wav2 < 0 !\n");
+			return  bak_len_wav2 - 100;
 		}
 		
 		if (bak_len_wav1 > bak_len_wav2+160)
@@ -410,7 +442,13 @@ extern "C" {
 
 		int len_window = FrmNum_wav_1;  // 截取的 对比帧 段数
 		int fram_move = FrmNum_wav_2 - FrmNum_wav_1; // 左右移动的范围
+		if (fram_move < 1)
+		{
+			printf("fram_move < 0 !\n");
+			return -3;
+		}
 		float *score = new float[fram_move];
+
 		double *cep_part_1 = new double[(PCEP - 1)*FrmNum_wav_1];
 		double *cep_part_2 = new double[(PCEP - 1)*FrmNum_wav_2];
 
@@ -528,12 +566,22 @@ extern "C" {
 
 		int len_wav2_hhh = len_wav1 + 2 * const_pos;
 		len_wav2_hhh = (len_wav2_hhh>bak_len_wav2) ? bak_len_wav2 : len_wav2_hhh ;
+		if (len_wav2_hhh < 1)
+		{
+			printf("len_wav2_hhh < 0 !\n");
+			return -4;
+		}
 
 		short *data_wav2_hhh = new short[len_wav2_hhh];
 		ret = ReadFile(file_b, data_wav2_hhh, bias_wav2_hhh, len_wav2_hhh);
 
 		// B的区域内移动  计算
 		int fram_move_hhh = len_wav2_hhh - len_wav1;
+		if (fram_move_hhh < 1)
+		{
+			printf("fram_move_hhh < 0 !\n");
+			return -5;
+		}
 		float *score_hhh = new float[fram_move_hhh];
 
 		float score_max = 0.0;
@@ -566,8 +614,11 @@ extern "C" {
 		delete[] data_wav2_hhh;
 		delete[] score_hhh;
 
+		delete[] bak_data_wav1;
+		delete[] bak_data_wav2;
 		delete[] data_wav1;
 		delete[] data_wav2;
+
 		delete[] data_scaled_wav1;
 		delete[] data_scaled_wav2;
 		delete[] score;
