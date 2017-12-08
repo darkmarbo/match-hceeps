@@ -286,7 +286,9 @@ int ReadFileLength(const char *wfile, int* sampleRate)
 
 
 /*
-	// 获取data的[2/5,3/5]范围内 能量最大的1.0s（或者1/5长度）数据段 的起始位置和长度
+	// flag == 1: 取语音中间的1/3
+	// flag == 2: 取全部语音
+	// flag == 3: 取语音中能量最大的1/3
 	// 
 */
 int get_window(const short *data, int len_data, int &st_win, int &len_win, int flag)
@@ -309,44 +311,251 @@ int get_window(const short *data, int len_data, int &st_win, int &len_win, int f
 		len_win = len_data;
 		return ret;
 	}
-
-	
-	short max_short = 30000;
-	int len_move = 0.005 * SAMPRATE;  // 移动10ms 
-	
-	st_win = 0;
-	double max_score = 0.0;
-
-	/*
-	int len_tmp = len_data / 5;
-
-	len_win = (1.0*SAMPRATE < len_tmp) ? 1.0*SAMPRATE : len_tmp;
-
-	// 在data的 1/4 - 3/4 范围内寻找 
-	int len_14 = 2*len_tmp;
-	int len_34 = 3.01*len_tmp;
-	for (int ii = len_14; ii < len_34 - len_win; ii += len_move)
+	else if (flag == 3)
 	{
-		// 计算窗内能量 
-		double score = 0.0;
-		for (int jj = 0; jj < len_win; jj++)
+		short max_short = 30000;
+		int len_move = 0.005 * SAMPRATE;  // 移动10ms 
+
+		st_win = 0;
+		double max_score = 0.0;
+
+
+		int len_tmp = len_data / 3;
+		len_win = len_tmp;
+		//len_win = (1.0*SAMPRATE < len_tmp) ? 1.0*SAMPRATE : len_tmp;
+
+		// 在data的 1/4 - 3/4 范围内寻找 
+		int len_14 = 0;// 2 * len_tmp;
+		int len_34 = len_data; // 3.01*len_tmp;
+		for (int ii = len_14; ii < len_34 - len_win; ii += len_move)
 		{
-			score += pow(double(data[ii+jj]) / double(max_short), 2);
+			// 计算窗内能量 
+			double score = 0.0;
+			for (int jj = 0; jj < len_win; jj++)
+			{
+				score += pow(double(data[ii + jj]) / double(max_short), 2);
+			}
+			if (score > max_score)
+			{
+				st_win = ii;
+				max_score = score;
+			}
+
 		}
-		if (score > max_score)
-		{
-			st_win = ii;
-			max_score = score;
-		}
-		
+
+		return ret;
 	}
-	*/
-
-
+	
 
 	return ret;
 }
 
+
+/*********************************************************************
+*
+*
+	// 相对于 speechMatch_small_v2 做相应修改：
+	// 直接使用采样点  做对齐 运行时间长
+
+	//Description: 两个小语音对齐（语音长度几秒到几分钟左右）
+// 对齐精度1ms以内
+*
+*  Parameters : file1：语音1路径
+*				file2：语音2路径
+*				bb：结果b
+*  Returns    : 返回错误代码
+*				0：对齐正常
+*				-1：采样率错误
+*				其他：读取wav失败
+
+*********************************************************************/
+
+#ifdef __cplusplus  
+extern "C" {
+#endif 
+	__declspec(dllexport)  int speechMatch_small_v3(const char *file1, const char *file2,
+		double &bb)
+	{
+
+		int ret = 0;
+		int bak_len_wav1 = 0; // wav1的总长度 备份 
+		int bak_len_wav2 = 0; // wav2的总长度 备份 
+		int bias_wav1 = 0; // wav1 开始读取的位置 
+		int len_wav1 = 0;  // wav1 读取的长度  后面用于计算 
+		int bias_wav2 = 0; // wav2 开始读取的长度  从这开始寻找 wav1
+		int len_wav2 = 0;  // wav2 读取的长度 在这个区间寻找 wav1 
+
+		short *bak_data_wav1 = NULL; // 整个wav1 
+		short *data_wav1 = NULL; // 用于计算的wav1
+	
+		const char *file_a = file1;
+		const char *file_b = file2;
+		int flag_rev = 0;
+
+		// 记录wav 长度 的bak信息  
+		bak_len_wav1 = ReadFileLength(file1, &sampleRate);
+		bak_len_wav2 = ReadFileLength(file2, &sampleRate);
+		if (sampleRate != SAMPRATE)
+		{
+			printf("[sampleRate:%d != 16000] !\n", sampleRate);
+			return -1;
+		}
+		if (bak_len_wav1 < 1)
+		{
+			printf("len_wav1 < 0 !\n");
+			return  bak_len_wav1 - 100;
+		}
+		if (bak_len_wav2 < 1)
+		{
+			printf("len_wav2 < 0 !\n");
+			return  bak_len_wav2 - 100;
+		}
+
+		// 更换file1和file2为较小的
+		if (bak_len_wav1 > bak_len_wav2)
+		{
+			flag_rev = 1;
+			file_a = file2;
+			file_b = file1;
+			int temp = bak_len_wav1;
+			bak_len_wav1 = bak_len_wav2;
+			bak_len_wav2 = temp;
+		}
+
+		///////////////////////////////////////////////////////////////////
+
+		// log 输出语音的时长  
+		printf("len_wav1=%.4fs\tlen_wav2=%.4fs\n",
+			double(bak_len_wav1) / double(SAMPRATE),
+			double(bak_len_wav2) / double(SAMPRATE));
+
+		// 读取整个语音数据 
+		bak_data_wav1 = new short[bak_len_wav1];
+		ret = ReadFile(file_a, bak_data_wav1, 0, bak_len_wav1);
+
+
+
+		
+		// 获取wav1 的bias_wav1开始的 len_wav1长度 用于匹配
+		get_window(bak_data_wav1, bak_len_wav1, bias_wav1, len_wav1, 3);
+		data_wav1 = new short[len_wav1];
+		ret = ReadFile(file_a, data_wav1, bias_wav1, len_wav1);
+
+
+		// 整个wav2 区域 
+		int bias_wav2_hhh = 0;
+		int len_wav2_hhh = bak_len_wav2;	
+		short *data_wav2_hhh = new short[len_wav2_hhh];
+		ret = ReadFile(file_b, data_wav2_hhh, bias_wav2_hhh, len_wav2_hhh);
+
+		// B的区域内移动  计算
+		int fram_move_hhh = len_wav2_hhh - len_wav1;
+		if (fram_move_hhh < 1)
+		{
+			printf("fram_move_hhh < 0 !\n");
+			return -5;
+		}
+
+		printf("============  开启第1遍匹配  ==============\n");
+		float *score_hhh = new float[fram_move_hhh];
+		for (int ii = 0; ii < fram_move_hhh;ii++)
+		{
+			score_hhh[ii] = 0;
+		}
+		
+		float score_max = 0.0;
+		int move_unit = 16; //// 移动步长 1ms = 16 
+		for (int pole = 0; pole < fram_move_hhh; pole += move_unit)
+		{
+			score_hhh[pole] = 0;
+			double ma = 0;
+			double mb = 0;
+			//// 每一个分量  x1 x2 xx
+			for (int jj = 0; jj<len_wav1; jj++)
+			{
+				// a*b/|a||b| 
+				float count = data_wav1[jj] * data_wav2_hhh[pole + jj]
+					/ len_wav1;
+				ma += pow(data_wav1[jj], 2); // x1平方  +  x2平方 
+				mb += pow(data_wav2_hhh[pole + jj], 2);
+				score_hhh[pole] += count;
+
+			}
+			score_hhh[pole] = score_hhh[pole] / (sqrt(ma)*sqrt(mb));
+		}
+
+		// wav1的 bias_wav1 对应到wav2的 bias_wav2_hhh + pos_hhh 
+		int pos_hhh = findLocalMaximum(score_hhh, fram_move_hhh);
+		printf("bb_tmp_1 = %.5f\n", double(bias_wav2_hhh + pos_hhh - bias_wav1) / double(SAMPRATE));
+
+		// score_hhh 数组不变，只需要把 核心区域的相应value计算出来  
+		printf("============  开启第2遍匹配  ==============\n");
+		int const_pos = 800;  // 50ms    // 第1遍计算出的pos_hhh 左右扩展const_pos 
+
+		for (int ii = 0; ii < fram_move_hhh; ii++)
+		{
+			score_hhh[ii] = 0;
+		}
+		
+		// score_hhh 中 需要重新计算的值 
+		int ii_left = (pos_hhh - const_pos > 0 ? (pos_hhh - const_pos) : 0);
+		int ii_right = (pos_hhh + const_pos<fram_move_hhh ? (pos_hhh + const_pos) : (fram_move_hhh));
+
+		score_max = 0.0;
+		for (int pole = ii_left; pole < ii_right; pole++)
+		{
+			score_hhh[pole] = 0;
+			double ma = 0;
+			double mb = 0;
+			//// 每一个分量  x1 x2 xx
+			for (int jj = 0; jj<len_wav1; jj++)
+			{
+				// a*b/|a||b| 
+				float count = data_wav1[jj] * data_wav2_hhh[pole + jj]
+					/ len_wav1;
+				ma += pow(data_wav1[jj], 2); // x1平方  +  x2平方 
+				mb += pow(data_wav2_hhh[pole + jj], 2);
+				score_hhh[pole] += count;
+
+			}
+			score_hhh[pole] = score_hhh[pole] / (sqrt(ma)*sqrt(mb));
+		}
+
+		// wav1的 bias_wav1 对应到wav2的 bias_wav2_hhh + pos_hhh 
+		pos_hhh = findLocalMaximum(score_hhh, fram_move_hhh);
+		printf("bb_tmp_2 = %.5f\n", double(bias_wav2_hhh + pos_hhh - bias_wav1) / double(SAMPRATE));
+
+		printf("============  第2遍计算完毕  ==============\n");
+		//// 折算成时间延迟 
+		pos_hhh = bias_wav2_hhh + pos_hhh - bias_wav1;
+		
+		
+		bb = double(pos_hhh) / double(SAMPRATE);
+
+		// 变换
+		if (flag_rev == 1)
+		{
+			double aa = 1.0;
+			aa = 1.0 / aa;
+			bb = 0.000 - bb / aa;
+		}
+
+		
+		delete[] score_hhh;
+
+		delete[] bak_data_wav1;
+	
+		delete[] data_wav1;
+		delete[] data_wav2_hhh;
+		
+
+		return 0;
+
+
+	}
+#ifdef __cplusplus  
+}
+#endif 
 
 /*********************************************************************
 *
@@ -436,8 +645,8 @@ extern "C" {
 
 
 		printf("============ 开始第一遍匹配 ==============\n");
-		// 获取wav1 的全部语音段 
-		get_window(bak_data_wav1, bak_len_wav1, bias_wav1, len_wav1, 2);
+		// 获取wav1 的bias_wav1开始的 len_wav1长度 用于匹配
+		get_window(bak_data_wav1, bak_len_wav1, bias_wav1, len_wav1, 3);
 		data_wav1 = new short[len_wav1];
 		// memcpy(data_wav1, bak_data_wav1+bias_wav1, sizeof(short)*len_wav1);
 		ret = ReadFile(file_a, data_wav1, bias_wav1, len_wav1);

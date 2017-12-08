@@ -49,6 +49,7 @@ __declspec(dllexport)  int speechMatch(const char *file1 ,const char *file2,
 __declspec(dllexport)  int speechMatch_large(const char *file1, const char *file2, double &bb);
 __declspec(dllexport)  int speechMatch_small(const char *file1, const char *file2, double &bb);
 __declspec(dllexport)  int speechMatch_small_v2(const char *file1, const char *file2, double &bb);
+__declspec(dllexport)  int speechMatch_small_v3(const char *file1, const char *file2, double &bb);
 __declspec(dllexport)  int speechMatch_conf(const char *file1 ,const char *file2, double &aa,double &bb);
 
 #ifdef __cplusplus  
