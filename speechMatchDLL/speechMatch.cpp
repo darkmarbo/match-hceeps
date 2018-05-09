@@ -437,7 +437,8 @@ extern "C" {
 
 		
 		// 获取wav1 的bias_wav1开始的 len_wav1长度 用于匹配
-		get_window(bak_data_wav1, bak_len_wav1, bias_wav1, len_wav1, 3);
+		//get_window(bak_data_wav1, bak_len_wav1, bias_wav1, len_wav1, 3);
+		get_window(bak_data_wav1, bak_len_wav1, bias_wav1, len_wav1, 2);
 		data_wav1 = new short[len_wav1];
 		ret = ReadFile(file_a, data_wav1, bias_wav1, len_wav1);
 
@@ -464,7 +465,8 @@ extern "C" {
 		}
 		
 		float score_max = 0.0;
-		int move_unit = 16; //// 移动步长 1ms = 16 
+		int move_unit = 4; //// 移动步长 1ms = 16 
+		//int move_unit = 8; //// 移动步长 1ms = 16
 		for (int pole = 0; pole < fram_move_hhh; pole += move_unit)
 		{
 			score_hhh[pole] = 0;
@@ -490,7 +492,8 @@ extern "C" {
 
 		// score_hhh 数组不变，只需要把 核心区域的相应value计算出来  
 		printf("============  开启第2遍匹配  ==============\n");
-		int const_pos = 800;  // 50ms    // 第1遍计算出的pos_hhh 左右扩展const_pos 
+		//int const_pos = 800;  // 50ms    // 第1遍计算出的pos_hhh 左右扩展const_pos
+		int const_pos = 80;  // 5ms    // 第1遍计算出的pos_hhh 左右扩展const_pos
 
 		for (int ii = 0; ii < fram_move_hhh; ii++)
 		{
@@ -1417,6 +1420,12 @@ __declspec(dllexport)  int speechMatch_a(const char *file1, const char *file2, d
 	bb_b0 = deviations[0] - positions[0] - dengcha/double(numPart-2);
 	bb_temp = bb_temp/double(numPart-1);
 
+	// 每段对齐结果
+	for (int ii = 0; ii < numPart - 1;ii++)
+	{
+		printf("seg_%d\tx=%.4f\ty=%.4f\n",ii, positions[ii], deviations[ii]);
+	}
+
 	int poly_n=1;
 	double a[3];//poly_n+1
 	polyfit(numPart-2,positions,deviations,poly_n,a);
@@ -1458,6 +1467,7 @@ __declspec(dllexport)  int speechMatch_a(const char *file1, const char *file2, d
 	}
 	else
 	{
+		printf("a=%.4f\n",aa);
 		return 1;
 	}
 	
@@ -1931,17 +1941,24 @@ __declspec(dllexport)  int speechMatch(const char *file1 ,const char *file2, con
 {  
 
 	int ret = 0;
-	FILE* fp_debug;		
-	fp_debug = fopen("debug.txt","a+");
+	
     
 	//读取标杆语音的长度和采样率 然后short数！
 	printf("read wav_1:%s\nread wav_2:%s\n", file1, file2);
 	int len_wav_1 = ReadFileLength(file1, &sampleRate);
 	int len_wav_2 = ReadFileLength(file2, &sampleRate);
-	if(len_wav_1<=0 || len_wav_2 <= 0)
+	int len_wav_2bak = len_wav_2;
+
+	// return -1 ~ -6
+	if(len_wav_1<=0 )
 	{
 		printf("read_file wav err!\n");
-		return -1;
+		return len_wav_1;
+	}
+	if ( len_wav_2 <= 0)
+	{
+		printf("read_file wav err!\n");
+		return len_wav_2;
 	}
 
 	double time_len_wav_2 = end_time-st_time;	
@@ -1951,10 +1968,20 @@ __declspec(dllexport)  int speechMatch(const char *file1 ,const char *file2, con
 	printf("bias=%d\tlen_wav_2=%d\n",bias,len_wav_2);
 
 	//wav1比wav2长度要小	
-	if (sampleRate != SAMPRATE || time_len_wav_2 > double(len_wav_2)/16000.0 || time_len_wav_2 < double(len_wav_1)/16000.0 ) 
+	if (sampleRate != SAMPRATE ) 
 	{
 		printf("[sampleRate:%d != 16000] or [len_wav_2:%d < len_wav_1:%d]!\n", sampleRate, len_wav_2, len_wav_1);	
-		return -1;
+		return -11;
+	}
+	if (time_len_wav_2 > double(len_wav_2bak) / 16000.0)
+	{
+		printf("[sampleRate:%d != 16000] or [len_wav_2:%d < len_wav_1:%d]!\n", sampleRate, len_wav_2, len_wav_1);
+		return -12;
+	}
+	if ( time_len_wav_2 < double(len_wav_1) / 16000.0)
+	{
+		printf("[sampleRate:%d != 16000] or [len_wav_2:%d < len_wav_1:%d]!\n", sampleRate, len_wav_2, len_wav_1);
+		return -13;
 	}
 	
 
@@ -1965,14 +1992,14 @@ __declspec(dllexport)  int speechMatch(const char *file1 ,const char *file2, con
 	if(ret < 0)
 	{
 		printf("ReadFile:%s error!\n",file1);
-		return 0;
+		return -20 + ret;
 	}
 
 	ret = ReadFile(file2, data_wav2, bias, len_wav_2);
 	if(ret < 0)
 	{
 		printf("ReadFile:%s error!\n",file2);
-		return 0;
+		return -30 + ret ;
 	}
 	
 
@@ -2046,31 +2073,41 @@ __declspec(dllexport)  int speechMatch(const char *file1 ,const char *file2, con
 		}			
 	}
 
-	printf("窗 左右移动的帧数=%d\n", fram_move);
+	//FILE* fp_debug = NULL;
+	FILE* fp_debug = fopen("debug.txt", "a+");
+	
 	for (int pole = 0; pole < fram_move; pole++)  
 	{
 		score[pole] = 0;
+		double ma = 0;
+		double mb = 0;
+		//// 每一个分量  x1 x2 xx
 		for (int jj=0; jj<len_window*(PCEP-1); jj++)
 		{
-			float count = cep_part_1[jj] * cep_part_2[pole*(PCEP-1)+jj] / float(len_window*(PCEP-1));
+			//float count = cep_part_1[jj] * cep_part_2[pole*(PCEP-1)+jj] / float(len_window*(PCEP-1));
+			//score[pole] += count;
+
+			
+			// a*b/|a||b| 
+			float count = cep_part_1[jj] * cep_part_2[pole*(PCEP - 1) + jj];
+			ma += pow(cep_part_1[jj], 2); // x1平方  +  x2平方 
+			mb += pow(cep_part_2[pole*(PCEP - 1) + jj], 2);
 			score[pole] += count;
-					
-		}		
-		//fprintf(fp_debug, "score[%d]=%f\n", pole, score[pole]);
+				
+		}	
+		score[pole] = score[pole] / (sqrt(ma)*sqrt(mb));
+		
+		if (fp_debug)
+		{
+			fprintf(fp_debug, "score[%.4f]=%.4f\n", (double)(pole) / 50.0, score[pole]);
+		}
 	}
 
-	// 自己与自己匹配计算得到最大值  
-	float score_self = 0.0;
-	for (int jj=0; jj<len_window*(PCEP-1); jj++)
-	{
-		float count = cep_part_1[jj] * cep_part_1[jj] / float(len_window*(PCEP-1));
-		score_self += count;
-					
-	}		
+	
 
 	float pos = findLocalMaximum(score, fram_move);	
-	int eee = int(1000*(score[int(pos)]/score_self));
-	printf("\nscore_max=%.4f\tscore_self=%.4f\teee=%d\n", score[int(pos)], score_self, eee);
+	int confidence = int(100*(score[int(pos)]));
+	printf("\nscore_max=%.4f\tconfidence=%d\n", score[int(pos)], confidence);
 
 	bb = (double)(pos)/50.0;	
 		
@@ -2082,14 +2119,166 @@ __declspec(dllexport)  int speechMatch(const char *file1 ,const char *file2, con
 	delete [] cep_part_1;
 	delete [] cep_part_2;
 
-	fclose(fp_debug);
-	fp_debug = NULL;
+	if (fp_debug)
+	{
+		fclose(fp_debug);
+		fp_debug = NULL;
+	}
+	
 
 	// 返回匹配度！
-	return eee;
+	return confidence;
 }
 #ifdef __cplusplus  
 }  
+#endif  
+
+
+/*
+一个大语音的某段时间内寻找小语音
+*/
+#ifdef __cplusplus  
+extern "C" {
+#endif  
+	__declspec(dllexport)  int speechMatch_v1(short *data_wav1, short *data_wav2,
+		int len_wav_1, int len_wav_2, double &bb)
+	{
+		int ret = 0;		
+		double time_len_wav_2;
+		int bias = 0;
+		
+		if ( len_wav_2 < len_wav_1 )
+		{
+			printf("error: len_wav_2 < len_wav_1 ");
+			return -12;
+		}
+
+		// 一帧=20ms	1s=50帧	； 一帧=16*20个short
+		int FrmNum_wav_1 = len_wav_1 / FrmLen;
+		int FrmNum_wav_2 = len_wav_2 / FrmLen;
+		
+
+		int len_window = FrmNum_wav_1;  // 截取的 对比帧 段数
+		int fram_move = FrmNum_wav_2 - FrmNum_wav_1; // 左右移动的范围
+		float *score = new float[fram_move];
+		double *cep_part_1 = new double[(PCEP - 1)*FrmNum_wav_1];
+		double *cep_part_2 = new double[(PCEP - 1)*FrmNum_wav_2];
+
+		float *data_scaled_wav1 = new float[len_wav_1];
+		float *data_scaled_wav2 = new float[len_wav_2];
+
+		DataScaling(data_wav1, data_scaled_wav1, len_wav_1);
+		DataScaling(data_wav2, data_scaled_wav2, len_wav_2);
+
+
+		InitHamming();//初始化汉明窗
+		InitFilt(FiltCoe1, FiltCoe2, Num); //初始化MEL滤波系数
+		double En[FiltNum + 1];         //频带能量
+		double Cep_wav_1[PCEP];//MFCC结果
+		double Cep_wav_2[PCEP];//MFCC结果	
+
+		for (int frame = 0; frame<FrmNum_wav_1; frame++) // 每一帧
+		{
+			//拿到一帧数据
+			for (int j = 0; j < FrmLen; j++)
+			{
+				dBuff_wav_1[j] = (double)data_scaled_wav1[frame*FrmLen + j];
+
+			}
+			// 针对一帧的数据进行处理
+			preemphasis(dBuff_wav_1, resultReference, FrmLen); //预加重结果存在result里面
+			HammingWindow(resultReference, dataReference); //给一帧数据加窗,存在data里面
+			
+			compute_fft(dataReference, vecList);
+			CFilt(dataReference, FiltCoe1, FiltCoe2, Num, En, vecList);
+			MFCC(En, Cep_wav_1);
+			vecList.clear();
+
+			for (int tick = 0; tick<PCEP - 1; tick++)  // 这一帧的12个mfcc系数
+			{
+				// 每一帧数据依次排列
+				cep_part_1[frame*(PCEP - 1) + tick] = Cep_wav_1[tick + 1];
+			}
+		}
+
+		for (int frame = 0; frame<FrmNum_wav_2; frame++) // 每一帧
+		{
+			//拿到一帧数据
+			for (int j = 0; j < FrmLen; j++)
+			{
+				dBuff_wav_2[j] = (double)data_scaled_wav2[frame * FrmLen + j];
+			}
+			// 针对一帧的数据进行处理
+			preemphasis(dBuff_wav_2, resultRaw, FrmLen);
+			HammingWindow(resultRaw, dataRaw);
+			compute_fft(dataRaw, vecList);
+			CFilt(dataRaw, FiltCoe1, FiltCoe2, Num, En, vecList);
+			MFCC(En, Cep_wav_2);
+			vecList.clear();
+
+			for (int tick = 0; tick<PCEP - 1; tick++)  // 这一帧的12个mfcc系数
+			{
+				cep_part_2[frame*(PCEP - 1) + tick] = Cep_wav_2[tick + 1];
+			}
+		}
+
+		// 进行匹配 
+		//FILE* fp_debug = NULL;
+		FILE* fp_debug = fopen("debug.txt", "a+");
+
+		for (int pole = 0; pole < fram_move; pole++)
+		{
+			score[pole] = 0;
+			double ma = 0;
+			double mb = 0;
+			//// 每一个分量  x1 x2 xx
+			for (int jj = 0; jj<len_window*(PCEP - 1); jj++)
+			{
+				//float count = cep_part_1[jj] * cep_part_2[pole*(PCEP-1)+jj] / float(len_window*(PCEP-1));
+				//score[pole] += count;
+
+
+				// a*b/|a||b| 
+				float count = cep_part_1[jj] * cep_part_2[pole*(PCEP - 1) + jj];
+				ma += pow(cep_part_1[jj], 2); // x1平方  +  x2平方 
+				mb += pow(cep_part_2[pole*(PCEP - 1) + jj], 2);
+				score[pole] += count;
+
+			}
+			score[pole] = score[pole] / (sqrt(ma)*sqrt(mb));
+
+			if (fp_debug)
+			{
+				fprintf(fp_debug, "score[%.4f]=%.4f\n", (double)(pole) / 50.0, score[pole]);
+			}
+		}
+
+
+
+		float pos = findLocalMaximum(score, fram_move);
+		int confidence = int(100 * (score[int(pos)]));
+		printf("\nscore_max=%.4f\tconfidence=%d\n", score[int(pos)], confidence);
+
+		bb = (double)(pos) / 50.0;
+
+
+		delete[] data_scaled_wav1;
+		delete[] data_scaled_wav2;
+		delete[] score;
+		delete[] cep_part_1;
+		delete[] cep_part_2;
+
+		if (fp_debug)
+		{
+			fclose(fp_debug);
+			fp_debug = NULL;
+		}
+
+		// 返回匹配度！
+		return confidence;
+	}
+#ifdef __cplusplus  
+}
 #endif  
 
 

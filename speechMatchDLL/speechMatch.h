@@ -46,6 +46,8 @@ __declspec(dllexport)  int speechMatch_a(const char *file1 ,const char *file2, d
 __declspec(dllexport)  int speechMatch_a_long(const char *file1 ,const char *file2, double &aa,double &bb);
 __declspec(dllexport)  int speechMatch(const char *file1 ,const char *file2, 
 	const double st_time, const double end_time, double &bb);
+__declspec(dllexport)  int speechMatch_v1(short *data_wav1, short *data_wav2,
+	int len_wav_1, int len_wav_2, double &bb);
 __declspec(dllexport)  int speechMatch_large(const char *file1, const char *file2, double &bb);
 __declspec(dllexport)  int speechMatch_small(const char *file1, const char *file2, double &bb);
 __declspec(dllexport)  int speechMatch_small_v2(const char *file1, const char *file2, double &bb);
