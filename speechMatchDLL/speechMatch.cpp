@@ -1937,7 +1937,8 @@ __declspec(dllexport)  int speechMatch_large(const char *file1, const char *file
 #ifdef __cplusplus  
 extern "C" {  
 #endif  
-__declspec(dllexport)  int speechMatch(const char *file1 ,const char *file2, const double st_time, const double end_time, double &bb)
+__declspec(dllexport)  int speechMatch(const char *file1 ,const char *file2,
+	const double st_time, const double end_time, double &bb)
 {  
 
 	int ret = 0;
@@ -1985,7 +1986,7 @@ __declspec(dllexport)  int speechMatch(const char *file1 ,const char *file2, con
 	}
 	
 
-
+	// 读取语音数据 
 	short *data_wav1 = new short[len_wav_1];
 	short *data_wav2 = new short[len_wav_2]; 
 	ret = ReadFile(file1, data_wav1, 0, len_wav_1);	
@@ -2002,130 +2003,18 @@ __declspec(dllexport)  int speechMatch(const char *file1 ,const char *file2, con
 		return -30 + ret ;
 	}
 	
-
-	// 一帧=20ms	1s=50帧	； 一帧=16*20个short
-	int FrmNum_wav_1 = len_wav_1/FrmLen;
-	int FrmNum_wav_2 = len_wav_2/FrmLen;
-	printf("FrmNum_wav_1=%d\tFrmNum_wav_2=%d\n", FrmNum_wav_1, FrmNum_wav_2);
-	printf("time_wav_1=%fs\ttime_wav_2=%fs\n", float(len_wav_1)/16000.0, float(len_wav_2)/16000.0);
-
-
-	int len_window = FrmNum_wav_1;  // 截取的 对比帧 段数
-	int fram_move = FrmNum_wav_2 - FrmNum_wav_1; // 左右移动的范围
-	float *score = new float[fram_move];
-	double *cep_part_1 = new double[(PCEP-1)*FrmNum_wav_1];
-	double *cep_part_2 = new double[(PCEP-1)*FrmNum_wav_2];	
-
-	float *data_scaled_wav1 = new float[len_wav_1];
-	float *data_scaled_wav2 = new float[len_wav_2];
-	
-	DataScaling(data_wav1, data_scaled_wav1, len_wav_1);
-	DataScaling(data_wav2, data_scaled_wav2, len_wav_2);
-		
-	
-	InitHamming();//初始化汉明窗
-	InitFilt(FiltCoe1, FiltCoe2, Num); //初始化MEL滤波系数
-	double En[FiltNum+1];         //频带能量
-	double Cep_wav_1[PCEP];//MFCC结果
-	double Cep_wav_2[PCEP];//MFCC结果	
-	
-	for (int frame=0; frame<FrmNum_wav_1; frame++) // 每一帧
-	{		
-		//拿到一帧数据
-		for (int j = 0; j < FrmLen; j++)
-		{
-			dBuff_wav_1[j] = (double)data_scaled_wav1[frame*FrmLen+j];
-
-		}
-		// 针对一帧的数据进行处理
-		preemphasis(dBuff_wav_1, resultReference, FrmLen); //预加重结果存在result里面
-		HammingWindow(resultReference, dataReference); //给一帧数据加窗,存在data里面
-		compute_fft(dataReference, vecList);
-		CFilt(dataReference, FiltCoe1, FiltCoe2, Num, En,vecList);
-		MFCC(En, Cep_wav_1);
-		vecList.clear();
-
-		for (int tick = 0; tick<PCEP-1; tick++)  // 这一帧的12个mfcc系数
-		{
-			// 每一帧数据依次排列
-			cep_part_1[frame*(PCEP-1)+tick] = Cep_wav_1[tick+1];  
-		}			
-	}
-
-	for (int frame=0; frame<FrmNum_wav_2; frame++) // 每一帧
-	{		
-		//拿到一帧数据
-		for (int j = 0; j < FrmLen; j++)
-		{
-			dBuff_wav_2[j] = (double)data_scaled_wav2[frame * FrmLen + j];
-		}
-		// 针对一帧的数据进行处理
-		preemphasis(dBuff_wav_2, resultRaw, FrmLen);
-		HammingWindow(resultRaw, dataRaw); 
-		compute_fft(dataRaw, vecList);
-		CFilt(dataRaw, FiltCoe1, FiltCoe2, Num, En,vecList);
-		MFCC(En, Cep_wav_2);
-		vecList.clear();
-
-		for (int tick = 0; tick<PCEP-1; tick++)  // 这一帧的12个mfcc系数
-		{
-			cep_part_2[frame*(PCEP-1)+tick] = Cep_wav_2[tick+1];
-		}			
-	}
-
-	//FILE* fp_debug = NULL;
-	FILE* fp_debug = fopen("debug.txt", "a+");
-	
-	for (int pole = 0; pole < fram_move; pole++)  
+	int confidence = speechMatch_v1(data_wav1, data_wav2,
+		len_wav_1, len_wav_2, bb);
+	if (confidence < 0)
 	{
-		score[pole] = 0;
-		double ma = 0;
-		double mb = 0;
-		//// 每一个分量  x1 x2 xx
-		for (int jj=0; jj<len_window*(PCEP-1); jj++)
-		{
-			//float count = cep_part_1[jj] * cep_part_2[pole*(PCEP-1)+jj] / float(len_window*(PCEP-1));
-			//score[pole] += count;
-
-			
-			// a*b/|a||b| 
-			float count = cep_part_1[jj] * cep_part_2[pole*(PCEP - 1) + jj];
-			ma += pow(cep_part_1[jj], 2); // x1平方  +  x2平方 
-			mb += pow(cep_part_2[pole*(PCEP - 1) + jj], 2);
-			score[pole] += count;
-				
-		}	
-		score[pole] = score[pole] / (sqrt(ma)*sqrt(mb));
-		
-		if (fp_debug)
-		{
-			fprintf(fp_debug, "score[%.4f]=%.4f\n", (double)(pole) / 50.0, score[pole]);
-		}
+		printf("error: speechMatch_v1 return < 0!");
+		return -100;
 	}
-
 	
-
-	float pos = findLocalMaximum(score, fram_move);	
-	int confidence = int(100*(score[int(pos)]));
-	printf("\nscore_max=%.4f\tconfidence=%d\n", score[int(pos)], confidence);
-
-	bb = (double)(pos)/50.0;	
 		
 	delete [] data_wav1;
 	delete [] data_wav2;      
-	delete [] data_scaled_wav1;
-	delete [] data_scaled_wav2 ;
-	delete [] score;
-	delete [] cep_part_1;
-	delete [] cep_part_2;
-
-	if (fp_debug)
-	{
-		fclose(fp_debug);
-		fp_debug = NULL;
-	}
 	
-
 	// 返回匹配度！
 	return confidence;
 }
